@@ -21,6 +21,8 @@ Firmware for the Waveshare **ESP32-S3-ePaper-1.54** board.
 | `ui.h` | e-paper rendering (GxEPD2) |
 
 ## Build & flash — two paths
+**First time building?** See [`../../docs/FIRMWARE_BUILD_ENV.md`](../../docs/FIRMWARE_BUILD_ENV.md) for exactly what to install (PlatformIO or Arduino IDE, USB drivers, libraries).
+
 **Easiest (no toolchain): browser flasher.** Once a `.bin` is built, open the install page and click Install. See [`../../docs/FLASHING.md`](../../docs/FLASHING.md).
 
 **PlatformIO** (recommended for building): `pio run -t upload` using `platformio.ini` (pins the exact library versions).

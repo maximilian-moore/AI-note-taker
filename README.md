@@ -42,6 +42,7 @@ proves the real device's path before it arrives. Flip `TRANSCRIBE_ENGINE`/
 | Guide | For |
 |---|---|
 | [`docs/END_TO_END.md`](./docs/END_TO_END.md) | Full test runbook (simulator now → device later) |
+| [`docs/FIRMWARE_BUILD_ENV.md`](./docs/FIRMWARE_BUILD_ENV.md) | **What to install to build the firmware** (toolchain setup) |
 | [`docs/FLASHING.md`](./docs/FLASHING.md) | Flashing the firmware (browser flasher / PlatformIO / Arduino IDE) |
 | [`docs/WIFI.md`](./docs/WIFI.md) | Connecting the device to Wi-Fi |
 | [`PRD.md`](./PRD.md) | Full product spec + roadmap |
