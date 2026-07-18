@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PocketScribe</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#fff; --ink:#1a1d24; --muted:#697386; --line:#e3e6ea;
+    --accent:#3b6cff; --accent-ink:#fff; --ok:#1f9d55; --warn:#d97706; --danger:#dc2626;
+    --shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.04);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0f1216;--card:#171b21;--ink:#e6e9ee;--muted:#9aa4b2;--line:#262c35;
+      --accent:#5b86ff;--shadow:0 1px 3px rgba(0,0,0,.4);}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink)}
+  a{color:var(--accent)}
+  button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:.5rem .9rem;
+    background:var(--accent);color:var(--accent-ink)}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  button.ghost:hover{color:var(--ink)}
+  input{font:inherit;padding:.55rem .7rem;border:1px solid var(--line);border-radius:8px;
+    background:var(--card);color:var(--ink);width:100%}
+  .hidden{display:none!important}
+
+  /* login */
+  #login{min-height:100vh;display:grid;place-items:center;padding:1rem}
+  #login .box{background:var(--card);padding:2rem;border-radius:14px;box-shadow:var(--shadow);
+    width:min(360px,100%);text-align:center}
+  #login h1{margin:.2rem 0 .1rem;font-size:1.4rem}
+  #login p{color:var(--muted);margin:0 0 1.3rem}
+  #login form{display:flex;flex-direction:column;gap:.7rem}
+  #loginErr{color:var(--danger);min-height:1.2em;font-size:.9rem}
+
+  /* app shell */
+  header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);
+    display:flex;gap:.8rem;align-items:center;padding:.7rem 1rem;flex-wrap:wrap}
+  header .brand{font-weight:700;letter-spacing:.2px}
+  header .brand small{color:var(--muted);font-weight:500}
+  header .search{flex:1;min-width:160px;max-width:420px}
+  .tabs{display:flex;gap:.3rem;padding:.6rem 1rem 0;max-width:900px;margin:0 auto;width:100%}
+  .tabs button{background:transparent;color:var(--muted);border-radius:8px 8px 0 0}
+  .tabs button.active{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+  main{max-width:900px;margin:0 auto;padding:1rem;width:100%}
+
+  .stats{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.5rem .8rem;min-width:90px}
+  .stat b{display:block;font-size:1.3rem}
+  .stat span{color:var(--muted);font-size:.8rem}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1rem;
+    box-shadow:var(--shadow);margin-bottom:.7rem;cursor:pointer}
+  .card:hover{border-color:var(--accent)}
+  .card .row{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline}
+  .card h3{margin:0;font-size:1.02rem}
+  .card .meta{color:var(--muted);font-size:.82rem;margin-top:.25rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .badge{font-size:.72rem;padding:.1rem .5rem;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .badge.meeting{color:var(--accent);border-color:var(--accent)}
+  .badge.status-processing{color:var(--warn);border-color:var(--warn)}
+  .badge.status-failed{color:var(--danger);border-color:var(--danger)}
+  .tag{font-size:.72rem;color:var(--muted)}
+  .empty{color:var(--muted);text-align:center;padding:3rem 1rem}
+
+  /* todo rows */
+  .todo{display:flex;gap:.7rem;align-items:flex-start;background:var(--card);border:1px solid var(--line);
+    border-radius:10px;padding:.6rem .8rem;margin-bottom:.5rem}
+  .todo input{width:auto;margin-top:.2rem}
+  .todo.done label{text-decoration:line-through;color:var(--muted)}
+  .todo .src{color:var(--muted);font-size:.78rem}
+
+  /* detail drawer */
+  #overlay{position:fixed;inset:0;background:rgba(8,12,20,.5);display:grid;place-items:end center;z-index:10}
+  #drawer{background:var(--card);width:min(720px,100%);max-height:92vh;overflow:auto;
+    border-radius:16px 16px 0 0;padding:1.2rem 1.2rem 2rem}
+  @media(min-width:720px){#overlay{place-items:center}#drawer{border-radius:16px}}
+  #drawer h2{margin:.2rem 0}
+  .dtabs{display:flex;gap:.3rem;margin:.9rem 0 .6rem;border-bottom:1px solid var(--line)}
+  .dtabs button{background:transparent;color:var(--muted);padding:.4rem .7rem}
+  .dtabs button.active{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+  .prose{white-space:pre-wrap;line-height:1.65}
+  .drawer-todos li{margin:.2rem 0}
+  audio{width:100%;margin:.6rem 0}
+  .drawer-actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login" class="hidden">
+  <div class="box">
+    <h1>PocketScribe</h1>
+    <p>Your AI note taker</p>
+    <form id="loginForm">
+      <input id="password" type="password" placeholder="Dashboard password" autocomplete="current-password" required>
+      <button type="submit">Sign in</button>
+      <div id="loginErr"></div>
+    </form>
+  </div>
+</section>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <div class="brand">PocketScribe <small>· notes</small></div>
+    <input class="search" id="search" type="search" placeholder="Search notes, tags, text…">
+    <button class="ghost" id="logout">Sign out</button>
+  </header>
+  <div class="tabs">
+    <button id="tabNotes" class="active">Notes</button>
+    <button id="tabTodos">To-dos</button>
+  </div>
+  <main>
+    <div class="stats" id="stats"></div>
+    <div id="notesView"></div>
+    <div id="todosView" class="hidden"></div>
+  </main>
+</div>
+
+<!-- DETAIL DRAWER -->
+<div id="overlay" class="hidden">
+  <div id="drawer"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = async (path, opts={}) => {
+  const r = await fetch(path, {credentials:'same-origin', headers:{'Content-Type':'application/json'}, ...opts});
+  if(r.status === 401){ showLogin(); throw new Error('unauthorized'); }
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const ct = r.headers.get('content-type')||'';
+  return ct.includes('json') ? r.json() : r;
+};
+const fmtDate = iso => iso ? new Date(iso).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}) : '';
+const esc = s => (s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---- auth screens ---- */
+function showLogin(){ $('#app').classList.add('hidden'); $('#overlay').classList.add('hidden'); $('#login').classList.remove('hidden'); }
+function showApp(){ $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); refresh(); }
+
+$('#loginForm').addEventListener('submit', async e=>{
+  e.preventDefault(); $('#loginErr').textContent='';
+  try{
+    await api('/api/login',{method:'POST',body:JSON.stringify({password:$('#password').value})});
+    $('#password').value=''; showApp();
+  }catch{ $('#loginErr').textContent='Wrong password'; }
+});
+$('#logout').addEventListener('click', async ()=>{ await api('/api/logout',{method:'POST'}); showLogin(); });
+
+/* ---- tabs ---- */
+let tab='notes';
+$('#tabNotes').addEventListener('click',()=>switchTab('notes'));
+$('#tabTodos').addEventListener('click',()=>switchTab('todos'));
+function switchTab(t){
+  tab=t;
+  $('#tabNotes').classList.toggle('active',t==='notes');
+  $('#tabTodos').classList.toggle('active',t==='todos');
+  $('#notesView').classList.toggle('hidden',t!=='notes');
+  $('#todosView').classList.toggle('hidden',t!=='todos');
+  refresh();
+}
+
+/* ---- data render ---- */
+let searchTimer;
+$('#search').addEventListener('input',()=>{ clearTimeout(searchTimer); searchTimer=setTimeout(refresh,250); });
+
+async function refresh(){
+  if(tab==='notes') await renderNotes(); else await renderTodos();
+}
+
+async function renderNotes(){
+  const q = $('#search').value.trim();
+  const notes = await api('/api/notes'+(q?('?q='+encodeURIComponent(q)):''));
+  const done = notes.length;
+  const meetings = notes.filter(n=>n.mode==='meeting').length;
+  $('#stats').innerHTML =
+    stat(done,'Notes') + stat(meetings,'Meetings');
+  const v = $('#notesView');
+  if(!notes.length){ v.innerHTML='<div class="empty">No notes yet.<br>Record something on the device and press sync.</div>'; return; }
+  v.innerHTML = notes.map(n=>`
+    <div class="card" data-id="${n.id}">
+      <div class="row"><h3>${esc(n.title)||'Untitled'}</h3>
+        <span class="badge ${n.mode==='meeting'?'meeting':''}">${n.mode}</span></div>
+      <div class="meta">
+        <span class="badge">${esc(n.category)||'General'}</span>
+        <span>${fmtDate(n.date)}</span>
+        ${n.tags.filter(Boolean).map(t=>`<span class="tag">#${esc(t)}</span>`).join('')}
+      </div>
+    </div>`).join('');
+  v.querySelectorAll('.card').forEach(c=>c.addEventListener('click',()=>openNote(c.dataset.id)));
+}
+const stat = (n,label)=>`<div class="stat"><b>${n}</b><span>${label}</span></div>`;
+
+async function renderTodos(){
+  const todos = await api('/api/todos?status=open');
+  const doneTodos = await api('/api/todos?status=done');
+  $('#stats').innerHTML = stat(todos.length,'Open') + stat(doneTodos.length,'Done');
+  const all = [...todos, ...doneTodos];
+  const v = $('#todosView');
+  if(!all.length){ v.innerHTML='<div class="empty">No to-dos extracted yet.</div>'; return; }
+  v.innerHTML = all.map(t=>`
+    <div class="todo ${t.status==='done'?'done':''}">
+      <input type="checkbox" ${t.status==='done'?'checked':''} data-id="${t.id}">
+      <div><label>${esc(t.text)}</label>
+        <div class="src">from “${esc(t.note_title)}”${t.due?(' · due '+esc(t.due)):''}</div></div>
+    </div>`).join('');
+  v.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',async()=>{
+    await api('/api/todos/'+cb.dataset.id,{method:'PATCH',body:JSON.stringify({status:cb.checked?'done':'open'})});
+    renderTodos();
+  }));
+}
+
+/* ---- note detail drawer ---- */
+$('#overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeDrawer(); });
+function closeDrawer(){ $('#overlay').classList.add('hidden'); $('#drawer').innerHTML=''; }
+
+async function openNote(id){
+  const n = await api('/api/notes/'+id);
+  const sections = {
+    cleaned:{label:'Cleaned', body:`<div class="prose">${esc(n.cleaned_text)||'—'}</div>`},
+    transcript:{label:'Transcript', body:`<div class="prose">${esc(n.raw_transcript)||'—'}</div>`},
+  };
+  if(n.summary) sections.summary={label:'Summary', body:`<div class="prose">${esc(n.summary)}</div>`};
+  const todosHtml = n.todos.length
+    ? `<h4>Action items</h4><ul class="drawer-todos">${n.todos.map(t=>`<li>${t.status==='done'?'✓ ':'• '}${esc(t.text)}</li>`).join('')}</ul>`
+    : '';
+  const audioHtml = n.has_audio ? `<audio controls src="/api/audio/${encodeURIComponent(n.uid)}"></audio>` : '';
+  $('#drawer').innerHTML = `
+    <div class="row" style="display:flex;justify-content:space-between;align-items:baseline;gap:.5rem">
+      <h2>${esc(n.title)||'Untitled'}</h2>
+      <span class="badge ${n.mode==='meeting'?'meeting':''}">${n.mode}</span>
+    </div>
+    <div class="meta" style="color:var(--muted);font-size:.85rem">
+      ${esc(n.category)} · ${fmtDate(n.date)} ${n.language?('· '+n.language):''} ${n.duration_s?('· '+n.duration_s+'s'):''}
+    </div>
+    ${audioHtml}
+    <div class="dtabs">${Object.keys(sections).map((k,i)=>`<button data-sec="${k}" class="${i===0?'active':''}">${sections[k].label}</button>`).join('')}</div>
+    <div id="secBody">${sections[Object.keys(sections)[0]].body}</div>
+    ${todosHtml}
+    <div class="drawer-actions">
+      <button class="ghost" id="reprocess">Re-run AI</button>
+      <button id="closeDrawer">Close</button>
+    </div>`;
+  $('#overlay').classList.remove('hidden');
+  $('#drawer').querySelectorAll('.dtabs button').forEach(b=>b.addEventListener('click',()=>{
+    $('#drawer').querySelectorAll('.dtabs button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    $('#secBody').innerHTML = sections[b.dataset.sec].body;
+  }));
+  $('#closeDrawer').addEventListener('click',closeDrawer);
+  $('#reprocess').addEventListener('click',async()=>{
+    $('#reprocess').textContent='Working…';
+    await api('/api/notes/'+id+'/reprocess',{method:'POST'});
+    setTimeout(async()=>{ closeDrawer(); refresh(); }, 800);
+  });
+}
+
+/* ---- boot ---- */
+(async()=>{
+  try{
+    const s = await api('/api/session');
+    s.authenticated ? showApp() : showLogin();
+  }catch{ showLogin(); }
+})();
+</script>
+</body>
+</html>

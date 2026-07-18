@@ -1,0 +1,21 @@
+# secrets & local config
+backend/.env
+*.env.local
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# data
+/data/
+*.db
+*.sqlite
+
+# build artifacts
+firmware/pocketscribe/build/
+firmware/pocketscribe/.pio/
+*.bin
+dist/
+node_modules/

@@ -1,0 +1,14 @@
+# Core (required)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+sqlmodel>=0.0.16
+python-multipart>=0.0.9
+pydantic-settings>=2.2
+
+# Cloud engines (only needed when TRANSCRIBE_ENGINE/LLM_ENGINE = cloud;
+# the default "mock" mode imports these lazily, so they're optional to run).
+openai>=1.30
+anthropic>=0.34
+
+# Local engines (Phase 3, optional)
+# faster-whisper>=1.0
