@@ -1,11 +1,13 @@
 """Filesystem storage: buffer upload chunks, reassemble into one audio file.
 
-Chunks are stored per-recording so an interrupted upload can resume. On the
-final chunk we concatenate in sequence order into DATA_DIR/audio/<uid>.<ext>.
+Contract (shared with firmware + tools/device_sim.py): the device records ONE
+audio file per recording and uploads it as ordered byte-range chunks. Chunk 0
+carries the file header (e.g. the 44-byte WAV header); every later chunk is a
+raw continuation of the same file. Reassembly is therefore a verbatim
+concatenation in sequence order — no per-chunk header handling — so the
+reassembled file is byte-identical to what the device recorded.
 
-WAV chunks get special handling: only the first chunk keeps its 44-byte header,
-so the reassembled file is a single valid WAV. Any other container (e.g. raw or
-opus) is treated as an opaque byte stream and simply concatenated.
+Chunks are stored per-recording so an interrupted upload can resume by seq.
 """
 from __future__ import annotations
 
@@ -17,7 +19,6 @@ from .config import settings
 _DATA = Path(settings.data_dir)
 _INCOMING = _DATA / "incoming"
 _AUDIO = _DATA / "audio"
-_WAV_HEADER_BYTES = 44
 
 _SAFE = re.compile(r"[^A-Za-z0-9_.-]")
 
@@ -43,17 +44,13 @@ def has_chunk(uid: str, seq: int) -> bool:
 
 
 def assemble(uid: str, ext: str = "wav") -> Path:
-    """Concatenate stored chunks in order; return the final audio path."""
+    """Concatenate stored chunks verbatim in seq order; return the audio path."""
     _AUDIO.mkdir(parents=True, exist_ok=True)
     out = _AUDIO / f"{_safe(uid)}.{ext}"
     parts = sorted(chunk_dir(uid).glob("*.part"))
-    is_wav = ext.lower() == "wav"
     with out.open("wb") as w:
-        for i, part in enumerate(parts):
-            raw = part.read_bytes()
-            if is_wav and i > 0 and len(raw) > _WAV_HEADER_BYTES:
-                raw = raw[_WAV_HEADER_BYTES:]  # strip duplicate WAV header
-            w.write(raw)
+        for part in parts:
+            w.write(part.read_bytes())
     return out
 
 

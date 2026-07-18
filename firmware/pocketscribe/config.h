@@ -1,41 +1,34 @@
-// PocketScribe firmware — compile-time config.
-// Runtime values (Wi-Fi creds, backend URL, pairing token) are set during
-// on-device provisioning (SoftAP captive portal) and stored in NVS — NOT here.
+// config.h — user-tunable firmware constants (NOT pins; see board_pins.h).
+// Runtime secrets (Wi-Fi creds, backend URL, pairing token) are entered during
+// on-device provisioning and stored in NVS — never hard-coded here.
 #pragma once
 
-// ---- Board: Waveshare ESP32-S3-Touch-ePaper-1.54 (N8R8) ---------------------
-// Pin map to be confirmed at hardware bring-up against the Waveshare schematic.
-// Placeholders below are grouped by subsystem so Phase 1 can fill them in.
+// ---- Identity / provisioning ----
+#define FW_VERSION        "0.1.0"
+#define SETUP_AP_SSID     "PocketScribe-Setup"   // captive-portal AP on first boot
+#define SETUP_AP_PASSWORD "pocket1234"           // 8+ chars; shown in the quick-start
 
-// E-paper (SPI)
-// #define EPD_CS   ..
-// #define EPD_DC   ..
-// #define EPD_RST  ..
-// #define EPD_BUSY ..
-
-// Audio ES8311 (I2C control + I2S data)
-// #define I2C_SDA  ..
-// #define I2C_SCL  ..
-// #define I2S_BCLK ..
-// #define I2S_LRCK ..
-// #define I2S_DIN  ..
-
-// microSD (SPI or SDMMC)
-// #define SD_CS    ..
-
-// Buttons: interaction is BUTTONS ONLY (no touch assumed on this unit).
-// Two usable buttons on the board (BOOT = GPIO0, PWR). Roles are provisional
-// and finalized at bring-up (BOOT is flash-mode when held at power-on; PWR may
-// tie into power management).
-//   Button A = Navigate (short: next page/item, long: next section)
-//   Button B = Record   (short: Quick Note, long: Meeting)
-// #define BTN_NAV_PIN   ..   // Button A
-// #define BTN_REC_PIN   ..   // Button B
-// #define VBAT_ADC      ..   // battery voltage divider
-
-// ---- Audio ------------------------------------------------------------------
+// ---- Audio capture ----
 #define AUDIO_SAMPLE_RATE   16000   // 16 kHz mono
-#define AUDIO_CHUNK_SECONDS 300     // 5-min segments (resumable upload)
+#define AUDIO_BITS          16
+#define AUDIO_CHANNELS      1
 
-// ---- Capture semantics ------------------------------------------------------
-#define BTN_LONGPRESS_MS    1500    // >= this = Meeting; shorter = Quick Note
+// ---- Upload ----
+#define UPLOAD_CHUNK_BYTES  (32 * 1024)   // must match tools/device_sim.py
+#define HTTP_TIMEOUT_MS     20000
+#define UPLOAD_MAX_RETRIES  4             // exponential backoff between retries
+
+// ---- Buttons ----
+#define BTN_DEBOUNCE_MS     30
+#define BTN_LONGPRESS_MS    1500   // >= this = Meeting (Button B) / next section (Button A)
+#define BTN_DOUBLE_GAP_MS   350    // two presses within this window = double-press (Sync now)
+
+// ---- Power ----
+#define VBAT_DIVIDER        2.0     // on-board resistor divider ratio — VERIFY
+#define VBAT_FULL_MV        4200
+#define VBAT_EMPTY_MV       3300
+#define VBAT_LOW_WARN_MV    3450    // warn + finalize current recording below this
+#define IDLE_SLEEP_MS       120000  // deep-sleep after this much inactivity
+
+// ---- Display ----
+#define EPD_PARTIAL_MAX     20      // full refresh after N partial refreshes (de-ghost)

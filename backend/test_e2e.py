@@ -72,9 +72,10 @@ def main():
     check(note["summary"], "meeting summary present")
     check(note["has_audio"], "audio available for playback")
 
-    # device audio streams
+    # device audio streams AND is byte-identical to what was uploaded
     ra = client.get(f"/device/recordings/{uid}/audio", headers=DEV)
     check(ra.status_code == 200 and ra.headers["content-type"] == "audio/wav", "audio streams")
+    check(ra.content == wav, "reassembled audio is byte-identical to the upload")
 
     # dashboard: login gate
     check(client.get("/api/notes").status_code == 401, "dashboard auth enforced")

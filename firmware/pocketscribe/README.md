@@ -1,26 +1,36 @@
 # PocketScribe firmware (Arduino-ESP32)
 
-Firmware for the Waveshare **ESP32-S3-Touch-ePaper-1.54** board.
+Firmware for the Waveshare **ESP32-S3-ePaper-1.54** board.
 
-> **Status:** Phase 0 scaffold. Sketch + drivers land in Phase 1.
+## What it does (PRD §6)
+- **Record** with **Button B** (short = Quick Note, long = Meeting) → 16 kHz mono WAV on microSD, works offline.
+- **Sync** with **Button B double-press** → uploads pending recordings and pulls back transcripts, to-dos and counts.
+- **Browse** with **Button A** → Home/status, To-dos, Notes, Meetings; open a note to **read** it and **play** the audio.
+- **Wi-Fi onboarding** with no hard-coded credentials via a captive-portal setup AP.
+- **Power**: LiPo gauge, low-battery auto-finalize, deep-sleep when idle.
 
-## Responsibilities (see PRD.md §6.1–6.5)
-- **Interaction:** buttons only, no touch. **Button B** records (short = Quick Note, long = Meeting); **Button A** navigates the screens.
-- **Capture:** records 16 kHz mono to microSD in chunks. Works offline.
-- **Sync:** when Wi-Fi is up, upload unsynced chunks to the backend (`/ingest`), resumable + retryable; pull `/device/state` for the screen.
-- **Display:** button-navigated e-paper — Home/status, To-dos, Notes (title + category), Meetings. Partial refresh for timers/paging.
-- **Power:** LiPo gauge, low-battery warning, safe shutdown (finalize current chunk), deep-sleep when idle.
-- **Onboarding:** first boot → SoftAP captive portal to enter Wi-Fi + backend URL + pairing token (stored in NVS).
+## Source layout
+| File | Responsibility |
+|---|---|
+| `pocketscribe.ino` | State machine, screens, lifecycle |
+| `board_pins.h` | GPIO map (e-paper confirmed; audio/SD/buttons marked **VERIFY**) |
+| `config.h` | Tunable constants (sample rate, timings, thresholds) |
+| `buttons.h` | Debounced 2-button input (short / long / double) |
+| `audio.h` | ES8311 + I2S: record WAV to SD, play back |
+| `netsync.h` | WiFiManager provisioning + chunked upload + state fetch |
+| `ui.h` | e-paper rendering (GxEPD2) |
 
-## Build & flash
+## Build & flash — two paths
+**Easiest (no toolchain): browser flasher.** Once a `.bin` is built, open the install page and click Install. See [`../../docs/FLASHING.md`](../../docs/FLASHING.md).
 
-Two supported paths (decided in Phase 1):
-- **Arduino IDE / arduino-cli** with the ESP32-S3 board package, or
-- **PlatformIO** (`platformio.ini` to be added).
+**PlatformIO** (recommended for building): `pio run -t upload` using `platformio.ini` (pins the exact library versions).
 
-For end users, the goal is **no toolchain at all**: a prebuilt binary flashed from a
-browser via ESP Web Tools. See [`../../docs/QUICKSTART.md`](../../docs/QUICKSTART.md).
+**Arduino IDE**: install ESP32 board support, the libraries in `platformio.ini` `lib_deps`, select an ESP32-S3 board with PSRAM (OPI) + 8 MB flash, open `pocketscribe.ino`, Upload.
 
-## Config
-- `config.h` — compile-time pins + audio constants (pin map TBD at bring-up).
-- Runtime secrets (Wi-Fi, backend URL, token) come from **provisioning**, never hard-coded.
+## ⚠ Bench bring-up checklist (before trusting a build)
+This code targets the documented hardware but **could not be compiled/flashed during development**. On first hardware contact, verify in `board_pins.h`:
+1. **e-paper** renders (pins are confirmed — should work first try).
+2. **microSD** mounts (`SD_CLK/CMD/D0`).
+3. **buttons** map to the right roles (which physical button is A vs B; BOOT=GPIO0).
+4. **audio** records/plays — the **ES8311 register sequence + I2S pins** in `audio.h` are the highest-risk items; cross-check Espressif's `es8311` driver.
+5. **battery ADC** pin + divider ratio.
