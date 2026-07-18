@@ -101,19 +101,22 @@ async def ingest(
         rec.status = SyncStatus.received
         s.add(rec)
 
-    if not settings.keep_audio:
-        pass  # audio kept until processed; retention pruning is a Phase 2 job
+    # (Audio is kept until processed; retention pruning per KEEP_AUDIO is a Phase 2 job.)
     storage.cleanup_chunks(recording_uid)
     background.add_task(process_recording, recording_uid)
     return {"received": True, "recording_uid": recording_uid, "final": True, "status": "processing"}
 
 
+def _aware(dt: datetime | None) -> datetime | None:
+    """Normalise to tz-aware UTC so naive+aware values can be compared/sorted."""
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def _iso(dt: datetime | None) -> str | None:
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.isoformat()
+    dt = _aware(dt)
+    return dt.isoformat() if dt else None
 
 
 @app.get("/device/state")
@@ -140,7 +143,7 @@ def device_state(_: None = Depends(auth.require_device)) -> dict:
         meetings = [entry(r) for r in recs if r.mode == Mode.meeting][:limit]
         processing = sum(1 for r in recs if r.status in (SyncStatus.received, SyncStatus.processing))
         done = sum(1 for r in recs if r.status == SyncStatus.done)
-        last = max((r.processed_at or r.started_at for r in recs), default=None)
+        last = max((_aware(r.processed_at or r.started_at) for r in recs), default=None)
 
         return {
             "counts": {

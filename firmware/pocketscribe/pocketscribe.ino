@@ -115,6 +115,7 @@ static void startRecording(const String &mode) {
   if (!recorder.start(path.c_str())) { toast("SD error"); return; }
   recStart = millis();
   screen = S_RECORDING;
+  ui::recordingStart(mode.c_str());   // full clear so the timer doesn't overlay Home
 }
 
 static void stopRecording() {

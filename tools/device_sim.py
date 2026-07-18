@@ -31,6 +31,7 @@ import mimetypes
 import os
 import sys
 import time
+import urllib.error
 import urllib.request
 import uuid
 import wave

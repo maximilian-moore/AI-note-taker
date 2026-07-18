@@ -90,6 +90,13 @@ static void home(int notes, int meetings, int openTodos, int onDevice,
   screen("Home", l, 6, "A = browse screens");
 }
 
+// Full clear + header once when recording starts, so the partial timer updates
+// below don't overlay leftover content from the previous screen.
+static void recordingStart(const char *mode) {
+  String l[1] = {String("Recording ") + mode + "..."};
+  screen("Recording", l, 1, "B = stop");
+}
+
 static void recording(const char *mode, uint32_t seconds) {
   // partial refresh of just the timer area for a smooth counter
   display.setPartialWindow(0, 60, 200, 60);
