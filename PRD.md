@@ -29,8 +29,9 @@ A pocket device that lets Max **capture spoken thoughts on the go** and **record
 | Power | **Add a LiPo cell** — firmware manages battery + safe low-power shutdown; USB power bank also works |
 | Note access | **Web dashboard**, reachable over the **internet via Max's own domain, password-protected + HTTPS** (Phase 2 hardening) |
 | Language | **German + English**, auto-detected per recording; outputs in the language spoken |
-| Recording control | **Physical button** (short = Quick Note, long = Meeting). Capture never needs touch |
-| Device display | **View-only browse**: Home/status, **To-do list**, **captured Notes** (title + category), **Meeting transcripts** list. Screen navigation via **touch** (capture stays on the button) |
+| Interaction | **Buttons only — no touch** (assumed until Max confirms on hardware). Board exposes **2 usable buttons** (BOOT + PWR) + RESET. **Button A = Navigate, Button B = Record** (roles provisional, finalized at bring-up) |
+| Recording control | **Button B** — short press = Quick Note start/stop, long press = Meeting start/stop |
+| Device display | **View-only browse**: Home/status, **To-do list**, **captured Notes** (title + category), **Meeting transcripts** list. Navigation via **Button A** (short = next page/item, long = next section) |
 | Firmware framework | **Arduino-ESP32** |
 | AI outputs per note | **Cleaned-up version + Action items + Meeting summary + Auto title & tags** (raw transcript always kept) |
 
@@ -42,7 +43,8 @@ A pocket device that lets Max **capture spoken thoughts on the go** and **record
 |---|---|---|
 | MCU | ESP32-S3-PICO-1-**N8R8** — dual-core LX7 @240MHz, **8MB flash, 8MB PSRAM** | Enough for audio buffering + Opus encoding; **not** enough for on-device speech-to-text |
 | Display | 1.54" **e-paper**, 200×200, B/W | Slow refresh (partial ~0.3s, full ~2s). Use for **static/glanceable** screens; use partial refresh for status changes. Not for scrolling text |
-| Touch | FT6336 capacitive (I²C) | Available for dashboard-like nav; **not required** for capture (button-first) |
+| Touch | **Assume NOT present** until confirmed on hardware (Max believes this unit has no touch) | UI must work with **buttons only**; no design depends on touch |
+| Buttons | **2 usable** — BOOT (GPIO0) + PWR, both programmable — plus RESET | All interaction (navigate + record) rides on these 2. RESET is not a UI input. BOOT held at power-on = flash mode; PWR may tie into power management → confirm dual-use at bring-up |
 | Audio | ES8311 codec + microphone (I²S) | Capture at **16 kHz mono**; the codec, not the CPU, does the analog work |
 | Storage | **microSD (TF) slot** | Buffers recordings offline; sync when Wi-Fi returns. **A microSD card is required** (document as a purchase item) |
 | Power | Onboard **LiPo charge management**; ships with **no cell** | Add a ~3.7V LiPo (e.g. 800–1200 mAh). Firmware reads battery voltage, warns low, safe-shuts-down |
@@ -98,9 +100,16 @@ flowchart LR
 
 ## 6. Functional requirements
 
+### 6.0 Interaction model (buttons only, no touch)
+Two usable buttons. Roles are **provisional** pending hardware bring-up:
+- **Button A — Navigate:** short press = next page/item on the current screen; long press = switch section (Home → To-dos → Notes → Meetings → Home).
+- **Button B — Record:** short press = Quick Note start/stop; long press = Meeting start/stop.
+- While recording, any Button B press stops; a low-battery event auto-stops and finalizes (FR-P2).
+- Debounce + press-length detection in firmware; visual confirmation on the e-paper for every action (no silent presses).
+
 ### 6.1 Firmware — capture (must-have)
-- **FR-C1** Single **short press** → start **Quick Note**; short press again → stop.
-- **FR-C2** **Long press** (≥1.5s) → start **Meeting**; long press → stop. (Distinct modes tag the recording so the backend applies the right AI pipeline.)
+- **FR-C1** **Button B short press** → start **Quick Note**; short press again → stop.
+- **FR-C2** **Button B long press** (≥1.5s) → start **Meeting**; long press → stop. (Distinct modes tag the recording so the backend applies the right AI pipeline.)
 - **FR-C3** Record 16 kHz mono to microSD. **Opus** target; **WAV** MVP fallback. Files chunked (e.g. 5-min segments) so long meetings and interrupted uploads are safe.
 - **FR-C4** Each recording gets a **manifest**: RTC timestamp, mode (quicknote/meeting), duration, device ID, sync status, checksum.
 - **FR-C5** Capture works with **no Wi-Fi**. Never block recording on network.
@@ -114,7 +123,7 @@ flowchart LR
 - **FR-S4** Sync is idempotent (checksums + IDs prevent duplicates).
 
 ### 6.3 Firmware — display (must-have)
-The e-paper is a **view-only browser** of what the device has captured. **Touch swipes/taps navigate between screens; the physical button only records.**
+The e-paper is a **view-only browser** of what the device has captured. **Button A navigates (short = next page/item, long = next section); Button B records.** No touch.
 - **FR-D1** **Home/status screen:** date/time (RTC), Wi-Fi + battery + sync status icons, counts (# notes, # meetings, # open to-dos), last sync time.
 - **FR-D2** **To-do screen:** current open to-do list (view-only; paged if long).
 - **FR-D3** **Notes screen:** list of captured Quick Notes — **title + category tag** + date; newest first, paged.
@@ -232,10 +241,10 @@ Repo layout (`/firmware`, `/backend`, `/dashboard`, `/docs`), CI build of firmwa
 2. **Backend host:** Max's home server — i5-9500T, 16 GB RAM, no GPU. Deploy guide targets Docker on this box. Local Whisper feasible; local LLM small-only. ✅
 3. **Firmware framework:** Arduino-ESP32. ✅
 4. **Dashboard access:** internet-facing on Max's own domain, password-protected + HTTPS (Cloudflare Tunnel recommended). ✅
-5. **Device display:** browsable Home / To-dos / Notes / Meetings, touch to navigate, button to record. ✅
+5. **Device display:** browsable Home / To-dos / Notes / Meetings, **buttons only** — Button A navigates, Button B records. ✅
 
 **Still assumed (correct me if wrong):**
-- **A1 Board variant** = touch + N8R8 (8MB/8MB) with onboard mic via ES8311. Confirm at first hardware bring-up.
+- **A1 Board variant** = N8R8 (8MB/8MB) with onboard mic via ES8311, **assumed NO touch** (per Max), **2 usable buttons** (BOOT + PWR). Confirm touch presence, button count, and which button is safe for Record vs Navigate at first hardware bring-up. If the unit *does* have touch, we can add optional touch nav later without changing the button flow.
 - **A2 Meeting length cap** ~2 h per recording.
 - **A3 Retention:** keep raw audio after processing by default (configurable).
 - **A4 Cloud provider keys:** Max supplies an Anthropic (Claude) API key and a Whisper-capable key (OpenAI) for the cloud path.

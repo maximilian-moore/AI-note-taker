@@ -13,7 +13,7 @@
 // #define EPD_RST  ..
 // #define EPD_BUSY ..
 
-// Touch FT6336 (I2C) and audio ES8311 (I2C control + I2S data)
+// Audio ES8311 (I2C control + I2S data)
 // #define I2C_SDA  ..
 // #define I2C_SCL  ..
 // #define I2S_BCLK ..
@@ -23,9 +23,15 @@
 // microSD (SPI or SDMMC)
 // #define SD_CS    ..
 
-// Physical capture button + battery ADC
-// #define BTN_PIN  ..
-// #define VBAT_ADC ..
+// Buttons: interaction is BUTTONS ONLY (no touch assumed on this unit).
+// Two usable buttons on the board (BOOT = GPIO0, PWR). Roles are provisional
+// and finalized at bring-up (BOOT is flash-mode when held at power-on; PWR may
+// tie into power management).
+//   Button A = Navigate (short: next page/item, long: next section)
+//   Button B = Record   (short: Quick Note, long: Meeting)
+// #define BTN_NAV_PIN   ..   // Button A
+// #define BTN_REC_PIN   ..   // Button B
+// #define VBAT_ADC      ..   // battery voltage divider
 
 // ---- Audio ------------------------------------------------------------------
 #define AUDIO_SAMPLE_RATE   16000   // 16 kHz mono

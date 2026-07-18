@@ -37,8 +37,10 @@ _No IDE, no drivers, no command line._
 4. Save — the device reboots and joins your network.
 
 ## 4. Capture your first note _(Phase 1)_
-- **Quick Note:** short-press the button, speak, short-press to stop.
+The device is button-only (no touch). The **Record button (Button B)**:
+- **Quick Note:** short-press to start, speak, short-press to stop.
 - **Meeting:** long-press to start, long-press to stop.
+- The **Navigate button (Button A)** cycles the screens (Home / To-dos / Notes / Meetings).
 - The screen shows "Saved ✓". When on Wi-Fi it uploads automatically.
 
 ## 5. Read your notes
