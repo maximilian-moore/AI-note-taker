@@ -23,13 +23,15 @@ A pocket device that lets Max **capture spoken thoughts on the go** and **record
 
 | Decision | Choice |
 |---|---|
-| AI processing location | **Hybrid / configurable** — backend supports both local (Whisper + Ollama) and cloud (Whisper/Deepgram + Claude) engines, selectable via config |
+| AI processing location | **Hybrid / configurable**; **MVP is cloud-first** (Whisper API + Claude), local path (faster-whisper + Ollama) wired after |
+| Backend host | **Max's home server** — Intel **i5-9500T**, **16 GB RAM, no GPU**. Local Whisper OK on CPU; local LLM only small/slow → cleanup/summaries best via cloud Claude |
 | Transcription timing | **Record-then-sync** (no live on-device transcript) |
 | Power | **Add a LiPo cell** — firmware manages battery + safe low-power shutdown; USB power bank also works |
-| Note access | **Web dashboard** on the LAN (remote-away-from-home access = optional Phase 2) |
+| Note access | **Web dashboard**, reachable over the **internet via Max's own domain, password-protected + HTTPS** (Phase 2 hardening) |
 | Language | **German + English**, auto-detected per recording; outputs in the language spoken |
-| Recording control | **Physical button** (single/long/double press) — no touch UI required to capture |
-| To-dos on device | **View only** on the e-paper; check-off happens in the dashboard |
+| Recording control | **Physical button** (short = Quick Note, long = Meeting). Capture never needs touch |
+| Device display | **View-only browse**: Home/status, **To-do list**, **captured Notes** (title + category), **Meeting transcripts** list. Screen navigation via **touch** (capture stays on the button) |
+| Firmware framework | **Arduino-ESP32** |
 | AI outputs per note | **Cleaned-up version + Action items + Meeting summary + Auto title & tags** (raw transcript always kept) |
 
 ---
@@ -112,10 +114,14 @@ flowchart LR
 - **FR-S4** Sync is idempotent (checksums + IDs prevent duplicates).
 
 ### 6.3 Firmware — display (must-have)
-- **FR-D1** **Idle/home screen:** date/time (RTC), Wi-Fi + battery + sync status icons, and **top open to-dos** (view-only).
-- **FR-D2** **Recording screen:** mode label + elapsed timer + level indicator.
-- **FR-D3** **Status screen:** last sync time, # pending uploads, backend reachable y/n, optional temp/humidity.
-- **FR-D4** Use **partial refresh** for timers/status to avoid full-screen flashing; full refresh on screen change / periodic ghosting cleanup.
+The e-paper is a **view-only browser** of what the device has captured. **Touch swipes/taps navigate between screens; the physical button only records.**
+- **FR-D1** **Home/status screen:** date/time (RTC), Wi-Fi + battery + sync status icons, counts (# notes, # meetings, # open to-dos), last sync time.
+- **FR-D2** **To-do screen:** current open to-do list (view-only; paged if long).
+- **FR-D3** **Notes screen:** list of captured Quick Notes — **title + category tag** + date; newest first, paged.
+- **FR-D4** **Meetings screen:** list of captured meeting transcripts — title + date + duration; paged.
+- **FR-D5** **Recording screen:** mode label + elapsed timer + level indicator (auto-shown while recording).
+- **FR-D6** Titles/categories/to-dos come from backend `GET /device/state` on sync; until a note is processed it shows as "Pending sync"/"Processing…".
+- **FR-D7** Use **partial refresh** for timers/paging to avoid full-screen flashing; full refresh on screen change / periodic ghosting cleanup.
 
 ### 6.4 Firmware — power (must-have, since LiPo added)
 - **FR-P1** Read battery voltage/percentage; show on e-paper.
@@ -138,8 +144,8 @@ flowchart LR
   - Auto title + tags.
   Output language = spoken language.
 - **FR-B4** **Storage** — SQLite + filesystem for MVP (single user); schema in §8. Keep raw audio (configurable retention) + raw transcript + all AI outputs.
-- **FR-B5** `GET /device/state` — return current open to-dos + status payload for the e-paper (FR-S3).
-- **FR-B6** **Auth** — device uses the pairing token; dashboard behind a simple password/login. LAN-only by default.
+- **FR-B5** `GET /device/state` — return the payload the e-paper browses: open to-dos, recent **notes** (title + category + date), recent **meetings** (title + date + duration), and counts + status (FR-S3, FR-D1–D6). Compact/paged for the small screen.
+- **FR-B6** **Auth** — device uses the pairing token; dashboard behind a password login. Designed to be exposed on Max's **own domain over HTTPS** (see FR-W6).
 - **FR-B7** **One-command deploy** — `docker compose up`; all config via a single `.env` (engine choices, API keys, retention, language hints).
 - **FR-B8** Idempotent ingest; processing is a retryable job queue (failed transcription/LLM calls don't lose audio).
 
@@ -149,6 +155,7 @@ flowchart LR
 - **FR-W3** **To-do view** across all notes: check off (writes back; surfaces to device via FR-B5), filter open/done.
 - **FR-W4** Responsive (phone + desktop).
 - **FR-W5** Re-run enrichment on a note (e.g. after switching engines) and edit cleaned text/to-dos manually.
+- **FR-W6** **Internet-accessible on Max's own domain, password-protected, HTTPS.** Backend runs on the home server; the dashboard is reachable publicly via a reverse proxy or secure tunnel with a login. Options documented: (a) reverse proxy (Caddy/Nginx) with Let's Encrypt on a port-forward, or (b) **Cloudflare Tunnel / Tailscale** to avoid opening ports. Recommended: Cloudflare Tunnel + login — no router changes, automatic HTTPS.
 
 ---
 
@@ -208,23 +215,31 @@ Repo layout (`/firmware`, `/backend`, `/dashboard`, `/docs`), CI build of firmwa
 - Dashboard: notes list + detail + to-do view.
 - **Goal:** press button → speak → see cleaned note + to-dos in browser.
 
-**Phase 2 — Enrichment & polish**
-- Meeting summaries, auto title/tags, DE/EN auto-detect, engine pluggability (local/cloud toggle), Opus encoding, battery management + safe shutdown, e-paper to-do list on home screen, search, re-run/edit.
+**Phase 2 — Enrichment, browse & remote access**
+- Meeting summaries, auto title/tags, DE/EN auto-detect, engine pluggability (local/cloud toggle), Opus encoding, battery management + safe shutdown.
+- Device **touch navigation** across Home / To-dos / Notes / Meetings screens.
+- **Internet-facing dashboard** on Max's domain (Cloudflare Tunnel + login, HTTPS), search, re-run/edit.
 
 **Phase 3 — Optional extensions**
-- Secure remote access away from home (Tailscale / Cloudflare Tunnel).
-- Obsidian/Notion export, touch UI on device, BLE provisioning, temp/humidity widget, multi-device.
+- Local engine path hardening (faster-whisper + Ollama on the home server), Obsidian/Notion export, touch UI refinements, BLE provisioning, temp/humidity widget, multi-device.
 
 ---
 
-## 12. Assumptions & open items (please confirm/correct)
-1. **Board variant** is the **touch + N8R8 (8MB/8MB)** model with onboard mic via ES8311. If yours differs, tell me — it changes audio/pins.
-2. **Default engines for MVP:** I'll start with **cloud** (fastest to a working demo — Whisper API + Claude), then wire the **local** path (faster-whisper + Ollama). Say the word if you'd rather MVP be local-first.
-3. **Backend host:** confirm where it runs (your server? Raspberry Pi? cloud VM?) — affects local-LLM feasibility and the deploy guide.
-4. **Firmware framework:** I'll use **Arduino-ESP32** (fastest, best library support for this Waveshare board, simplest for you to tweak) unless you prefer ESP-IDF.
-5. **Remote access** left out of v1 per your dashboard-only choice, despite your original "on the go from my phone" note — flag if you want it in v1.
-6. **Meeting length cap** assumed ~2 h per recording; fine?
-7. **Retention:** keep raw audio after processing by default (configurable). OK?
+## 12. Decisions locked & remaining assumptions
+
+**Resolved:**
+1. **MVP engines:** cloud-first (Whisper API + Claude); local path (faster-whisper + Ollama) wired after. ✅
+2. **Backend host:** Max's home server — i5-9500T, 16 GB RAM, no GPU. Deploy guide targets Docker on this box. Local Whisper feasible; local LLM small-only. ✅
+3. **Firmware framework:** Arduino-ESP32. ✅
+4. **Dashboard access:** internet-facing on Max's own domain, password-protected + HTTPS (Cloudflare Tunnel recommended). ✅
+5. **Device display:** browsable Home / To-dos / Notes / Meetings, touch to navigate, button to record. ✅
+
+**Still assumed (correct me if wrong):**
+- **A1 Board variant** = touch + N8R8 (8MB/8MB) with onboard mic via ES8311. Confirm at first hardware bring-up.
+- **A2 Meeting length cap** ~2 h per recording.
+- **A3 Retention:** keep raw audio after processing by default (configurable).
+- **A4 Cloud provider keys:** Max supplies an Anthropic (Claude) API key and a Whisper-capable key (OpenAI) for the cloud path.
+- **A5 Domain/tunnel:** exact domain + whether Cloudflare Tunnel vs port-forward is a setup-time choice; both documented.
 
 ## 13. Out of scope (v1)
 Live on-device transcription; speaker diarization/attribution; calendar integration; sharing/multi-user accounts; native mobile app (dashboard is a responsive web app).

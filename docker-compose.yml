@@ -1,0 +1,23 @@
+# PocketScribe — one-command deploy for Max's home server (i5-9500T, 16GB, no GPU).
+#   cp backend/.env.example backend/.env   # then fill in keys
+#   docker compose up -d
+services:
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    ports:
+      - "8080:8080"          # dashboard + API (put a tunnel / reverse proxy in front for HTTPS)
+    volumes:
+      - pocketscribe-data:/data
+    restart: unless-stopped
+
+  # Phase 2: expose the dashboard on your own domain over HTTPS without opening ports.
+  # Uncomment and set TUNNEL_TOKEN in .env (from the Cloudflare Zero Trust dashboard).
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+  #   restart: unless-stopped
+  #   depends_on: [backend]
+
+volumes:
+  pocketscribe-data:

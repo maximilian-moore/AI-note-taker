@@ -1,0 +1,11 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlmodel==0.0.22
+python-multipart==0.0.20
+pydantic-settings==2.7.1
+httpx==0.28.1
+# Cloud engines (MVP)
+openai==1.59.6          # Whisper API transcription
+anthropic==0.42.0       # Claude enrichment
+# Local engines (Phase 3, optional)
+# faster-whisper==1.1.0
