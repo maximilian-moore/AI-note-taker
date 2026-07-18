@@ -45,7 +45,7 @@ A pocket device that lets Max **capture spoken thoughts on the go** and **record
 | Display | 1.54" **e-paper**, 200×200, B/W | Slow refresh (partial ~0.3s, full ~2s). Use for **static/glanceable** screens; use partial refresh for status changes. Not for scrolling text |
 | Touch | **Assume NOT present** until confirmed on hardware (Max believes this unit has no touch) | UI must work with **buttons only**; no design depends on touch |
 | Buttons | **2 usable** — BOOT (GPIO0) + PWR, both programmable — plus RESET | All interaction (navigate + record) rides on these 2. RESET is not a UI input. BOOT held at power-on = flash mode; PWR may tie into power management → confirm dual-use at bring-up |
-| Audio | ES8311 codec + microphone (I²S) | Capture at **16 kHz mono**; the codec, not the CPU, does the analog work |
+| Audio | ES8311 codec (record **+ play**) + microphone (I²S) | Capture at **16 kHz mono**. **Playback (FR-D10)** needs an output path — onboard speaker or a speaker/headphone connector + amp. **Confirm at bring-up (A6)**; if absent, playback needs a small attached speaker |
 | Storage | **microSD (TF) slot** | Buffers recordings offline; sync when Wi-Fi returns. **A microSD card is required** (document as a purchase item) |
 | Power | Onboard **LiPo charge management**; ships with **no cell** | Add a ~3.7V LiPo (e.g. 800–1200 mAh). Firmware reads battery voltage, warns low, safe-shuts-down |
 | Sensors | RTC (timestamps), SHTC3 temp/humidity | RTC timestamps recordings even offline; temp/humidity optional dashboard widget |
@@ -101,11 +101,22 @@ flowchart LR
 ## 6. Functional requirements
 
 ### 6.0 Interaction model (buttons only, no touch)
-Two usable buttons. Roles are **provisional** pending hardware bring-up:
-- **Button A — Navigate:** short press = next page/item on the current screen; long press = switch section (Home → To-dos → Notes → Meetings → Home).
-- **Button B — Record:** short press = Quick Note start/stop; long press = Meeting start/stop.
-- While recording, any Button B press stops; a low-battery event auto-stops and finalizes (FR-P2).
-- Debounce + press-length detection in firmware; visual confirmation on the e-paper for every action (no silent presses).
+Two usable buttons drive a small two-level UI (top-level sections + drill-in detail). **The whole map below is provisional** and will be finalized against the real hardware, but it proves the feature set is reachable with 2 buttons.
+
+- **Button A = Navigate** (short = next item/page on the current screen; long = next section).
+- **Button B = Action** (context-dependent primary action, shown as an on-screen hint on every screen so no press is a guess).
+- **Button B double-press = Sync now** — available on any screen; this is the "click the device to sync" control.
+
+| Screen | A short | A long | B short | B long |
+|---|---|---|---|---|
+| **Home / Status** | refresh | next section | Quick Note | Meeting |
+| **To-dos** | next page | next section | Quick Note | Meeting |
+| **Notes (list)** | highlight next note | next section | **Open** note | Meeting |
+| **Meetings (list)** | highlight next meeting | next section | **Open** meeting | Meeting |
+| **Note / Meeting detail** | next page of text | back to list | **Play / Pause** audio | back to list |
+
+- While recording, a Button B press stops; low-battery auto-stops and finalizes (FR-P2).
+- Firmware handles debounce + press-length + double-press detection; every action gives visible e-paper feedback.
 
 ### 6.1 Firmware — capture (must-have)
 - **FR-C1** **Button B short press** → start **Quick Note**; short press again → stop.
@@ -117,20 +128,26 @@ Two usable buttons. Roles are **provisional** pending hardware bring-up:
 - **FR-C7** Graceful handling of: SD full, SD missing, recording interrupted by low battery (flush + finalize current chunk).
 
 ### 6.2 Firmware — sync (must-have)
-- **FR-S1** When Wi-Fi is available, upload unsynced recordings to backend `POST /ingest` in chunks, **resumable** and **retryable** with backoff.
-- **FR-S2** Mark uploaded chunks; delete from SD only after backend confirms receipt (configurable retention).
-- **FR-S3** Pull down the current **to-do list** and **status** for the e-paper (`GET /device/state`).
+- **FR-S1** When Wi-Fi is available, upload unsynced recordings to backend `POST /ingest` in chunks, **resumable** and **retryable** with backoff. Runs automatically **and** on demand (FR-S5).
+- **FR-S2** Mark uploaded chunks; delete audio from SD only after backend confirms receipt **and** per retention policy — but keep recent audio on SD for on-device playback (FR-D10).
+- **FR-S3** Pull down device state for the e-paper (`GET /device/state`): to-dos, recent notes (title + category), recent meetings (overview), and **sync counts** (FR-S7).
 - **FR-S4** Sync is idempotent (checksums + IDs prevent duplicates).
+- **FR-S5 Manual sync (device-driven):** Button B double-press triggers "Sync now" from any screen — upload pending recordings, then pull latest state/content. Screen shows progress and result.
+- **FR-S6 Sync-back of results:** on sync, pull newly **processed** content — cleaned text, raw transcript, summary, to-dos — and cache it on SD so notes/meetings are **readable and playable offline** (FR-D9/D10). Backend detail fetched per item (FR-B9); large text paged.
+- **FR-S7 Three-state visibility:** track and display, per recording, which of these it is — **(a) on device only** (not uploaded), **(b) uploaded, processing** (in cloud, not yet transcribed), **(c) done** (transcript + results available). Home/Status shows counts for each + **last-synced timestamp**, so Max always knows what is and isn't in the cloud.
 
 ### 6.3 Firmware — display (must-have)
-The e-paper is a **view-only browser** of what the device has captured. **Button A navigates (short = next page/item, long = next section); Button B records.** No touch.
-- **FR-D1** **Home/status screen:** date/time (RTC), Wi-Fi + battery + sync status icons, counts (# notes, # meetings, # open to-dos), last sync time.
+The e-paper **browses and plays back** what the device has captured. Navigation via buttons only (§6.0). To-dos are view-only; notes/meetings can be opened, read, and played.
+- **FR-D1** **Home / Status screen:** date/time (RTC), Wi-Fi + battery icons, **last-synced timestamp**, and the **three-state sync counts** (on-device-only / processing / done) from FR-S7, plus totals (# notes, # meetings, # open to-dos). Shows the "●● = Sync now" hint.
 - **FR-D2** **To-do screen:** current open to-do list (view-only; paged if long).
-- **FR-D3** **Notes screen:** list of captured Quick Notes — **title + category tag** + date; newest first, paged.
-- **FR-D4** **Meetings screen:** list of captured meeting transcripts — title + date + duration; paged.
+- **FR-D3** **Notes screen:** list of captured Quick Notes — **title + category tag** + date + per-item sync state; newest first, paged; **Open** to read/play.
+- **FR-D4** **Meetings screen:** list of meetings — title + date + duration + sync state; paged; **Open** for overview/read/play.
 - **FR-D5** **Recording screen:** mode label + elapsed timer + level indicator (auto-shown while recording).
-- **FR-D6** Titles/categories/to-dos come from backend `GET /device/state` on sync; until a note is processed it shows as "Pending sync"/"Processing…".
+- **FR-D6** Titles/categories/to-dos/text come from the backend on sync (FR-S3/S6); a not-yet-processed item shows "On device — not synced" or "Processing…" per its state.
 - **FR-D7** Use **partial refresh** for timers/paging to avoid full-screen flashing; full refresh on screen change / periodic ghosting cleanup.
+- **FR-D8** **Sync feedback:** on manual/auto sync, show progress ("Uploading 2/3…", "Fetching results…") and outcome ("Synced ✓ 14:32"), then the updated counts.
+- **FR-D9 Read on device:** opening a note/meeting shows its **cleaned text** (toggle to **raw transcript**); meetings also show the **summary/overview** first. Text is **paged** (Button A), small font — sized for review, not long-form reading (full text lives in the dashboard).
+- **FR-D10 Listen on device:** in a note/meeting detail, **Button B = Play/Pause** the original audio through the board's audio output. Plays from SD if the audio is still local; otherwise fetches from the backend on demand (FR-B10) when audio retention is on. *(Requires a confirmed audio-output path — see hardware note / A6.)*
 
 ### 6.4 Firmware — power (must-have, since LiPo added)
 - **FR-P1** Read battery voltage/percentage; show on e-paper.
@@ -153,10 +170,12 @@ The e-paper is a **view-only browser** of what the device has captured. **Button
   - Auto title + tags.
   Output language = spoken language.
 - **FR-B4** **Storage** — SQLite + filesystem for MVP (single user); schema in §8. Keep raw audio (configurable retention) + raw transcript + all AI outputs.
-- **FR-B5** `GET /device/state` — return the payload the e-paper browses: open to-dos, recent **notes** (title + category + date), recent **meetings** (title + date + duration), and counts + status (FR-S3, FR-D1–D6). Compact/paged for the small screen.
+- **FR-B5** `GET /device/state` — return the payload the e-paper browses: open to-dos, recent **notes** (title + category + date + status), recent **meetings** (title + date + duration + status), the **three-state sync counts** (FR-S7), last-processed timestamps, and status. Compact/paged for the small screen (metadata only — full text via FR-B9).
 - **FR-B6** **Auth** — device uses the pairing token; dashboard behind a password login. Designed to be exposed on Max's **own domain over HTTPS** (see FR-W6).
 - **FR-B7** **One-command deploy** — `docker compose up`; all config via a single `.env` (engine choices, API keys, retention, language hints).
 - **FR-B8** Idempotent ingest; processing is a retryable job queue (failed transcription/LLM calls don't lose audio).
+- **FR-B9** `GET /device/notes/{uid}` — return one item's full content for on-device reading: cleaned text, raw transcript, summary (meetings), to-dos, category/tags. Paginated/chunked so the device can page without loading everything at once.
+- **FR-B10** `GET /device/recordings/{uid}/audio` — stream the original audio for on-device playback (FR-D10), in a device-friendly format/bitrate. Available while audio retention is on.
 
 ### 6.7 Web dashboard (must-have)
 - **FR-W1** Notes list with title, date, mode, tags; **search** by text/tag.
@@ -189,7 +208,9 @@ Todo(id, note_id, text, owner?, due?, status[open|done], created_at, updated_at)
 Device(id, name, paired_token_hash, last_seen_at, battery_pct, fw_version)
 ```
 
-Device state endpoint returns: `{ open_todos: [...top N...], pending_uploads, last_sync_at, backend_ok }`.
+`GET /device/state` returns: `{ counts: {on_device_only, processing, done, open_todos}, open_todos:[...], notes:[{uid,title,category,date,status}], meetings:[{uid,title,date,duration_s,status}], last_sync_at, backend_ok }`. Full per-item text/audio via `GET /device/notes/{uid}` (FR-B9) and `GET /device/recordings/{uid}/audio` (FR-B10).
+
+**Device-side (SD) cache:** the firmware keeps a local mirror of recent items — recording manifests with an `uploaded` flag (drives the "on device only" count), plus cached text and audio for offline read/listen. `Recording` carries a stable **`uid`** (device-generated) so device and backend agree on identity across sync.
 
 ---
 
@@ -219,14 +240,14 @@ Prompts are versioned and language-aware (DE/EN). Cleaning prompt explicitly: re
 Repo layout (`/firmware`, `/backend`, `/dashboard`, `/docs`), CI build of firmware binary, backend skeleton, this PRD.
 
 **Phase 1 — MVP capture→sync→read (the core loop)**
-- Firmware: button capture (both modes), WAV to microSD, Wi-Fi provisioning, browser flashing, basic e-paper (home/recording/status), chunked upload.
+- Firmware: button capture (both modes), WAV to microSD, Wi-Fi provisioning, browser flashing, basic e-paper (home/recording/status), chunked upload, **manual sync (double-press) + three-state sync counts + last-synced time**.
 - Backend: ingest, one transcription engine (pick default), one LLM engine, SQLite, `/ingest` + `/device/state`.
 - Dashboard: notes list + detail + to-do view.
-- **Goal:** press button → speak → see cleaned note + to-dos in browser.
+- **Goal:** press button → speak → double-press to sync → see cleaned note + to-dos in browser, and the device shows what's synced.
 
-**Phase 2 — Enrichment, browse & remote access**
+**Phase 2 — Browse, read/listen on device & remote access**
 - Meeting summaries, auto title/tags, DE/EN auto-detect, engine pluggability (local/cloud toggle), Opus encoding, battery management + safe shutdown.
-- Device **touch navigation** across Home / To-dos / Notes / Meetings screens.
+- Device **button navigation** across Home / To-dos / Notes / Meetings; **sync-back of results** + **on-device reading** (FR-D9) and **audio playback** (FR-D10, pending A6).
 - **Internet-facing dashboard** on Max's domain (Cloudflare Tunnel + login, HTTPS), search, re-run/edit.
 
 **Phase 3 — Optional extensions**
@@ -246,7 +267,9 @@ Repo layout (`/firmware`, `/backend`, `/dashboard`, `/docs`), CI build of firmwa
 **Still assumed (correct me if wrong):**
 - **A1 Board variant** = N8R8 (8MB/8MB) with onboard mic via ES8311, **assumed NO touch** (per Max), **2 usable buttons** (BOOT + PWR). Confirm touch presence, button count, and which button is safe for Record vs Navigate at first hardware bring-up. If the unit *does* have touch, we can add optional touch nav later without changing the button flow.
 - **A2 Meeting length cap** ~2 h per recording.
-- **A3 Retention:** keep raw audio after processing by default (configurable).
+- **A3 Retention:** keep raw audio after processing by default (configurable) — required for on-device playback of older items (FR-D10).
+- **A6 Audio output path** for playback (speaker/connector/amp) exists or can be attached — confirm at bring-up; playback (FR-D10) depends on it.
+- **A7 On-device reading** is paged/small-font for review; full-length reading stays in the dashboard.
 - **A4 Cloud provider keys:** Max supplies an Anthropic (Claude) API key and a Whisper-capable key (OpenAI) for the cloud path.
 - **A5 Domain/tunnel:** exact domain + whether Cloudflare Tunnel vs port-forward is a setup-time choice; both documented.
 

@@ -24,6 +24,7 @@ class SyncStatus(str, Enum):
 
 class Recording(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    uid: str = Field(index=True, unique=True)   # device-generated stable id (matches SD cache)
     device_id: str
     mode: Mode = Mode.quicknote
     started_at: datetime = Field(default_factory=_now)

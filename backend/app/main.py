@@ -61,19 +61,44 @@ async def ingest(
 # --- device: state for the e-paper (FR-B5) ----------------------------------
 @app.get("/device/state")
 def device_state(x_device_token: str | None = Header(default=None)) -> dict:
-    """What the e-paper browses: to-dos, recent notes, recent meetings, counts.
+    """What the e-paper browses: to-dos, recent notes/meetings, and the
+    three-state sync counts (on-device-only / processing / done) + last sync.
 
     TODO(Phase 1): query real data, compact/paged for the 200x200 screen.
+    Metadata only here; full text/audio via the endpoints below.
     """
     _require_device(x_device_token)
     return {
-        "counts": {"notes": 0, "meetings": 0, "open_todos": 0, "pending_uploads": 0},
+        "counts": {"on_device_only": 0, "processing": 0, "done": 0, "open_todos": 0},
         "open_todos": [],       # [{text, due}]
-        "notes": [],            # [{title, category, date}]
-        "meetings": [],         # [{title, date, duration_s}]
+        "notes": [],            # [{uid, title, category, date, status}]
+        "meetings": [],         # [{uid, title, date, duration_s, status}]
         "last_sync_at": None,
         "backend_ok": True,
     }
+
+
+# --- device: read one item on the e-paper (FR-B9) ---------------------------
+@app.get("/device/notes/{uid}")
+def device_note(uid: str, x_device_token: str | None = Header(default=None)) -> dict:
+    """Full content of one note/meeting for on-device reading (paged by device).
+
+    TODO(Phase 1/2): return cleaned_text, raw_transcript, summary, todos, tags.
+    """
+    _require_device(x_device_token)
+    return {"uid": uid, "title": "", "category": "", "cleaned_text": "",
+            "raw_transcript": "", "summary": "", "todos": [], "tags": []}
+
+
+# --- device: fetch audio for playback (FR-B10) ------------------------------
+@app.get("/device/recordings/{uid}/audio")
+def device_audio(uid: str, x_device_token: str | None = Header(default=None)):
+    """Stream original audio for on-device playback, device-friendly format.
+
+    TODO(Phase 2): StreamingResponse of the stored audio if retention is on.
+    """
+    _require_device(x_device_token)
+    raise HTTPException(status_code=501, detail="audio playback lands in Phase 2")
 
 
 # --- dashboard API (FR-W*) ---------------------------------------------------
