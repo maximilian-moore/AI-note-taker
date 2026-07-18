@@ -206,8 +206,13 @@ void setup() {
   }
   audio::begin();
 
+  // Recovery: hold Button A during power-on to force the Wi-Fi setup portal.
+  buttons.begin();
+  pinMode(BTN_A_PIN, BTN_ACTIVE_LOW ? INPUT_PULLUP : INPUT_PULLDOWN);
+  bool forceSetup = (digitalRead(BTN_A_PIN) == (BTN_ACTIVE_LOW ? LOW : HIGH));
+
   ui::boot("Connecting Wi-Fi...");
-  net::begin([](const char *ap){ ui::setup(ap, SETUP_AP_PASSWORD); });
+  net::begin([](const char *ap){ ui::setup(ap, SETUP_AP_PASSWORD); }, forceSetup);
 
   refreshState();
   screen = S_HOME;

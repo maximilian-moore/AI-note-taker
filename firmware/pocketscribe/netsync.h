@@ -52,9 +52,11 @@ static void saveConfig() {
   prefs.end();
 }
 
-// Blocks until Wi-Fi is connected (opens the setup portal if needed).
-// `portalCb` lets the UI show "Setup mode — join PocketScribe-Setup".
-static bool begin(void (*portalCb)(const char * apSsid) = nullptr) {
+// Connect to Wi-Fi, running the captive-portal setup when needed. Set
+// `forcePortal` to always open the portal (re-provisioning). `portalCb` lets
+// the UI show "Setup mode — join PocketScribe-Setup". Persists the custom
+// Backend URL + pairing token fields on save.
+static bool begin(void (*portalCb)(const char * apSsid) = nullptr, bool forcePortal = false) {
   loadConfig();
   WiFiManager wm;
   WiFiManagerParameter pUrl("url", "Backend URL (http://ip:8080)", cfg.backendUrl.c_str(), 96);
@@ -64,18 +66,14 @@ static bool begin(void (*portalCb)(const char * apSsid) = nullptr) {
   wm.setConfigPortalTimeout(300);  // 5 min, then retry/sleep
   if (portalCb) wm.setAPCallback([portalCb](WiFiManager *m){ portalCb(SETUP_AP_SSID); });
 
-  bool ok = wm.autoConnect(SETUP_AP_SSID, SETUP_AP_PASSWORD);
+  bool ok = forcePortal ? wm.startConfigPortal(SETUP_AP_SSID, SETUP_AP_PASSWORD)
+                        : wm.autoConnect(SETUP_AP_SSID, SETUP_AP_PASSWORD);
   if (ok) {
-    cfg.backendUrl = pUrl.getValue();
-    cfg.token = pTok.getValue();
+    if (strlen(pUrl.getValue())) cfg.backendUrl = pUrl.getValue();
+    if (strlen(pTok.getValue())) cfg.token = pTok.getValue();
     saveConfig();
   }
   return ok;
-}
-
-static void openPortal() {  // called from the UI to re-provision on demand
-  WiFiManager wm;
-  wm.startConfigPortal(SETUP_AP_SSID, SETUP_AP_PASSWORD);
 }
 
 // ---- HTTP helpers ----

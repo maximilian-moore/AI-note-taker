@@ -24,9 +24,26 @@ from a password-protected web dashboard.
 2. **Backend** — the "brain": transcription (cloud Whisper now, local later) + Claude enrichment. Runs on Max's home server via Docker.
 3. **Dashboard** — read/manage notes from any browser, exposed on Max's own domain over HTTPS.
 
-## Getting started
+## Try the whole flow in 2 minutes (no hardware, no API keys)
 
-- **Build the device / flash it:** see [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).
-- **Run the backend:** `cp backend/.env.example backend/.env`, fill in keys, then `docker compose up -d`.
+```bash
+cp backend/.env.example backend/.env      # set DEVICE_PAIRING_TOKEN + DASHBOARD_PASSWORD
+docker compose up -d                      # backend + dashboard on :8080  (engines default to keyless "mock")
+python tools/device_sim.py --url http://localhost:8080 --token <token> \
+    record --mode meeting --gen 3 \
+    --text "Um, we agreed to ship Friday. I need to email the deck to the team."
+# then open http://localhost:8080  (log in with DASHBOARD_PASSWORD)
+```
+The simulator uses the **exact same HTTP contract as the firmware**, so this
+proves the real device's path before it arrives. Flip `TRANSCRIBE_ENGINE`/
+`LLM_ENGINE` to `cloud` (+ keys) for real Whisper + Claude.
+
+## Docs
+| Guide | For |
+|---|---|
+| [`docs/END_TO_END.md`](./docs/END_TO_END.md) | Full test runbook (simulator now → device later) |
+| [`docs/FLASHING.md`](./docs/FLASHING.md) | Flashing the firmware (browser flasher / PlatformIO / Arduino IDE) |
+| [`docs/WIFI.md`](./docs/WIFI.md) | Connecting the device to Wi-Fi |
+| [`PRD.md`](./PRD.md) | Full product spec + roadmap |
 
 Cloud-first for the MVP; everything is designed so you can move transcription/LLM local later.

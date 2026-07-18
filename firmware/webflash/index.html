@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install PocketScribe</title>
+<!-- ESP Web Tools: flashes the ESP32-S3 straight from Chrome/Edge via Web Serial.
+     This page is meant to be hosted by you (e.g. GitHub Pages) or opened locally
+     in Chrome/Edge. It loads esp-web-tools from a CDN. -->
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+<style>
+  body{font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;
+    margin:0 auto;padding:2rem 1.2rem;color:#1a1d24;background:#f4f5f7}
+  @media(prefers-color-scheme:dark){body{background:#0f1216;color:#e6e9ee}}
+  h1{margin:.2rem 0}
+  .card{background:#fff;border-radius:14px;padding:1.4rem;margin:1.2rem 0;
+    box-shadow:0 1px 3px rgba(16,24,40,.1)}
+  @media(prefers-color-scheme:dark){.card{background:#171b21}}
+  ol{padding-left:1.2rem} li{margin:.35rem 0}
+  code{background:rgba(127,127,127,.15);padding:.1rem .35rem;border-radius:5px}
+  .cta{text-align:center;margin:1.4rem 0}
+  .muted{color:#697386;font-size:.9rem}
+  esp-web-install-button{--esp-tools-button-color:#3b6cff;--esp-tools-button-text-color:#fff}
+</style>
+</head>
+<body>
+  <h1>Install PocketScribe</h1>
+  <p>Flash the firmware onto your Waveshare ESP32-S3 e-paper board — straight from this page, no software to install.</p>
+
+  <div class="card">
+    <ol>
+      <li>Use <strong>Chrome</strong> or <strong>Edge</strong> on a computer (Web Serial isn't in Safari/Firefox).</li>
+      <li>Insert a <strong>microSD card</strong> into the board.</li>
+      <li>Connect the board with a <strong>USB-C</strong> cable.</li>
+      <li>Click <strong>Install</strong> below and choose the serial port.</li>
+    </ol>
+    <div class="cta">
+      <esp-web-install-button manifest="manifest.json">
+        <button slot="activate">⚡ Install PocketScribe</button>
+        <span slot="unsupported">Your browser can't flash — use Chrome or Edge on desktop.</span>
+        <span slot="not-allowed">Serial access was blocked — allow it and retry.</span>
+      </esp-web-install-button>
+    </div>
+    <p class="muted">Port not showing up? Hold <code>BOOT</code>, tap <code>RESET</code>, release <code>BOOT</code> to force download mode, then retry.</p>
+  </div>
+
+  <p class="muted">After flashing, the device starts a Wi-Fi hotspot called <code>PocketScribe-Setup</code> — connect to it from your phone to enter your Wi-Fi and backend details. See the project's <code>docs/WIFI.md</code>.</p>
+</body>
+</html>
