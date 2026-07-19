@@ -51,12 +51,14 @@
 
 // ---- Buttons ----
 // BTN_A = Navigate (BOOT, GPIO0, active-LOW).
-// BTN_B = Record (PWR button, GPIO18). NOTE: the Waveshare PWR button reads
-// HIGH when pressed (active-HIGH) — unlike BOOT. See BTN_B_ACTIVE_LOW below.
+// BTN_B = Record (PWR button, GPIO18, active-LOW). VERIFIED on hardware
+// (2026-07-19 GPIO hunt): the PWR button shorts GPIO18 to GND, reading LOW when
+// pressed with an internal pull-up — same polarity as BOOT, not active-HIGH as
+// originally guessed. GPIO18 is not a boot strap, so it's safe to wake on.
 #define BTN_A_PIN   0      // BOOT button
 #define BTN_B_PIN   18     // PWR/user button
 #define BTN_ACTIVE_LOW 1   // BTN_A pulls LOW when pressed
-#define BTN_B_ACTIVE_LOW 0 // BTN_B (PWR) reads HIGH when pressed
+#define BTN_B_ACTIVE_LOW 1 // BTN_B (PWR) pulls LOW when pressed
 
 // ---- Battery voltage sense (LiPo) ----
 // ADC1_CH3 = GPIO4. Requires VBAT_PWR_EN driven HIGH to enable the divider.

@@ -15,7 +15,22 @@ namespace ui {
 GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT>
     display(GxEPD2_154_D67(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
 
-static int partialCount = 0;
+// Start high so the very first draw is a full refresh that seeds the panel.
+static int partialCount = EPD_PARTIAL_MAX;
+
+// Choose partial vs full window before a page loop. Full refresh is slow (~2s)
+// and flashes; use it only to seed the first frame and periodically (every
+// EPD_PARTIAL_MAX draws) to clear ghosting. Everything else is a partial
+// refresh — fast, no flash — so screen changes feel responsive.
+static void beginWindow(bool forceFull) {
+  if (forceFull || partialCount >= EPD_PARTIAL_MAX) {
+    display.setFullWindow();
+    partialCount = 0;
+  } else {
+    display.setPartialWindow(0, 0, 200, 200);
+    partialCount++;
+  }
+}
 
 static void begin() {
   // Panel power is enabled in setup() via board::powerOn() (EPD rail is
@@ -41,9 +56,16 @@ static void header(const char *title) {
   display.drawFastHLine(0, 24, 200, GxEPD_BLACK);
 }
 
-// Draw a titled screen with up to `n` body lines (small font). Full refresh.
-static void screen(const char *title, const String *lines, int n, const char *footer = nullptr) {
-  display.setFullWindow();
+// Draw a titled screen with up to `n` body lines (small font).
+// forceFull defaults FALSE: section/list changes use a fast partial refresh
+// (~0.5s) so the loop isn't blocked ~1.8s per nav (a full refresh starves
+// button polling — taps during it are lost). beginWindow() still forces a full
+// refresh on the first draw and every EPD_PARTIAL_MAX draws to clear ghosting.
+// Pass forceFull=true only for screens that must render crisply every time
+// (boot, recording start).
+static void screen(const char *title, const String *lines, int n,
+                   const char *footer = nullptr, bool forceFull = false) {
+  beginWindow(forceFull);
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
@@ -61,13 +83,12 @@ static void screen(const char *title, const String *lines, int n, const char *fo
       display.print(footer);
     }
   } while (display.nextPage());
-  partialCount = 0;
 }
 
 // --- screens -----------------------------------------------------------------
 static void boot(const char *msg) {
   String l[1] = {String(msg)};
-  screen("PocketScribe", l, 1, FW_VERSION);
+  screen("PocketScribe", l, 1, FW_VERSION, /*forceFull=*/true);
 }
 
 static void setup(const char *apSsid, const char *apPass) {
@@ -99,7 +120,7 @@ static void home(int notes, int meetings, int openTodos, int onDevice,
 // below don't overlay leftover content from the previous screen.
 static void recordingStart(const char *mode) {
   String l[1] = {String("Recording ") + mode + "..."};
-  screen("Recording", l, 1, "B = stop");
+  screen("Recording", l, 1, "B = stop", /*forceFull=*/true);
 }
 
 static void recording(const char *mode, uint32_t seconds) {
@@ -125,7 +146,7 @@ static void syncing(const char *phase, int seq, int count) {
 
 // A browsable list screen (Notes / Meetings / To-dos). `sel` highlights a row.
 static void list(const char *title, const String *items, int n, int sel, const char *footer) {
-  display.setFullWindow();
+  beginWindow(/*forceFull=*/false);
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
@@ -141,7 +162,6 @@ static void list(const char *title, const String *items, int n, int sel, const c
     }
     if (footer) { display.drawFastHLine(0, 186, 200, GxEPD_BLACK); display.setCursor(4, 190); display.print(footer); }
   } while (display.nextPage());
-  partialCount = 0;
 }
 
 // A page of note text for on-device reading (FR-D9).

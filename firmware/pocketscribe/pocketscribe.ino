@@ -18,6 +18,10 @@
 #include "netsync.h"
 #include "ui.h"
 
+// Bring-up diagnostic: 1 = print raw button pin levels 2x/sec so you can see
+// whether GPIO0 (Button A) actually toggles when pressed. Set 0 to silence.
+#define BTN_DEBUG 1
+
 enum Screen { S_HOME, S_TODOS, S_NOTES, S_MEETINGS, S_DETAIL, S_RECORDING };
 
 Buttons buttons;
@@ -194,6 +198,7 @@ static void nextSection() {
   sel = 0;
   screen = (screen == S_HOME) ? S_TODOS : (screen == S_TODOS) ? S_NOTES
          : (screen == S_NOTES) ? S_MEETINGS : S_HOME;
+  Serial.printf("[nav] -> screen=%d\n", (int)screen);
 }
 
 // --------------------------------------------------------------- lifecycle ---
@@ -217,10 +222,13 @@ void setup() {
   }
   audio::begin();
 
-  // Recovery: hold Button A during power-on to force the Wi-Fi setup portal.
+  // Recovery: hold Button B (PWR) during power-on to force the Wi-Fi setup
+  // portal. NOTE: must NOT use Button A here — A is BOOT/GPIO0, a boot strap;
+  // holding it at reset puts the ESP32-S3 in USB download mode and the app
+  // never runs. GPIO18 (PWR) is not a strap, so it's safe to sample at boot.
   buttons.begin();
-  pinMode(BTN_A_PIN, BTN_ACTIVE_LOW ? INPUT_PULLUP : INPUT_PULLDOWN);
-  bool forceSetup = (digitalRead(BTN_A_PIN) == (BTN_ACTIVE_LOW ? LOW : HIGH));
+  pinMode(BTN_B_PIN, BTN_B_ACTIVE_LOW ? INPUT_PULLUP : INPUT_PULLDOWN);
+  bool forceSetup = (digitalRead(BTN_B_PIN) == (BTN_B_ACTIVE_LOW ? LOW : HIGH));
 
   ui::boot("Connecting Wi-Fi...");
   net::begin([](const char *ap){ ui::setup(ap, SETUP_AP_PASSWORD); }, forceSetup);
@@ -236,15 +244,40 @@ void loop() {
   if (screen == S_RECORDING) {
     recorder.pump();
     static uint32_t lastTick = 0;
-    if (millis() - lastTick > 1000) {
+    // Update every 3s, not 1s: each e-paper refresh blocks the loop (~0.5s
+    // partial) and button polling with it, so a frequent tick makes Stop feel
+    // laggy. 3s keeps a live-ish counter while leaving the loop free to catch a
+    // B press promptly. Wall-clock elapsed (not byte-derived) so the timer
+    // advances even if mic capture yields no data; recorder.seconds() (byte
+    // count) is used only for the stored WAV duration.
+    if (millis() - lastTick > 3000) {
       lastTick = millis();
-      ui::recording(recMode.c_str(), recorder.seconds());
+      ui::recording(recMode.c_str(), (millis() - recStart) / 1000);
     }
     if (battPercent() <= 5) stopRecording();   // FR-P2: finalize on low battery
   }
 
+#if BTN_DEBUG
+  {
+    // Raw levels straight from the pins (no debounce). Press A: gpio0 should
+    // flip 1->0 (active-low). Press B (PWR): gpio18 should flip 0->1.
+    static uint32_t dbgT = 0;
+    if (millis() - dbgT > 500) {
+      dbgT = millis();
+      Serial.printf("[raw] A/gpio%d=%d  B/gpio%d=%d\n",
+                    BTN_A_PIN, digitalRead(BTN_A_PIN),
+                    BTN_B_PIN, digitalRead(BTN_B_PIN));
+    }
+  }
+#endif
+
   BtnEvent e = buttons.poll();
-  if (e != BTN_NONE) lastActivity = millis();
+  if (e != BTN_NONE) {
+    // Diagnostic: watch on the serial monitor to confirm A/B events fire.
+    // e: 1=A_SHORT 2=A_LONG 3=B_SHORT 4=B_LONG 5=B_DOUBLE ; screen 0=Home.
+    Serial.printf("[btn] e=%d screen=%d\n", (int)e, (int)screen);
+    lastActivity = millis();
+  }
 
   switch (e) {
     case BTN_B_SHORT:
@@ -261,23 +294,34 @@ void loop() {
       doSync();
       break;
     case BTN_A_SHORT:
+      // Short A always advances to the next section (Home -> To-dos -> Notes ->
+      // Meetings -> Home) so a single tap cycles every screen. Detail is not a
+      // section, so there a short tap pages through the note text instead.
       if (screen == S_DETAIL) { detailPage++; drawCurrent(); }
-      else if (screen == S_NOTES || screen == S_MEETINGS) { sel++; drawCurrent(); }
+      else { nextSection(); drawCurrent(); }
       break;
     case BTN_A_LONG:
+      // Long A: in Detail, back to the list. In a list, scroll the selection to
+      // the next item (short A is now reserved for section cycling). On Home, a
+      // long A triggers Sync (moved off the old B double-tap). To-dos falls
+      // through to a section advance.
       if (screen == S_DETAIL) { screen = lastListScreen; drawCurrent(); }
+      else if (screen == S_NOTES || screen == S_MEETINGS) { sel++; drawCurrent(); }
+      else if (screen == S_HOME) { doSync(); }
       else { nextSection(); drawCurrent(); }
       break;
     default: break;
   }
 
-  // Idle -> deep sleep; a Button A press wakes it. NOTE: the wake pin must be an
-  // RTC-capable GPIO (S3: GPIO0-21). BTN_A = GPIO0 qualifies; if you remap the
-  // buttons at bring-up, pick an RTC GPIO for the wake source.
+  // Idle -> deep sleep; a Button B press wakes it. NOTE: wake on B (GPIO18),
+  // NOT A. ext1 wake resets the chip, and the ROM samples strapping pins at
+  // reset. BTN_A = GPIO0 is a strap: if it's still held LOW when the ROM reads
+  // it (very likely during a real press), the chip enters USB download mode and
+  // the app never runs. GPIO18 is RTC-capable and not a strap, so it's safe.
   if (screen != S_RECORDING && millis() - lastActivity > IDLE_SLEEP_MS) {
-    ui::boot("Sleeping - press A");
-    esp_sleep_enable_ext1_wakeup(1ULL << BTN_A_PIN,
-                                 BTN_ACTIVE_LOW ? ESP_EXT1_WAKEUP_ANY_LOW : ESP_EXT1_WAKEUP_ANY_HIGH);
+    ui::boot("Sleeping - press B");
+    esp_sleep_enable_ext1_wakeup(1ULL << BTN_B_PIN,
+                                 BTN_B_ACTIVE_LOW ? ESP_EXT1_WAKEUP_ANY_LOW : ESP_EXT1_WAKEUP_ANY_HIGH);
     esp_deep_sleep_start();
   }
   delay(5);
