@@ -18,11 +18,16 @@ GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT>
 static int partialCount = 0;
 
 static void begin() {
-#ifdef EPD_PWR_EN
-  pinMode(EPD_PWR_EN, OUTPUT);
-  digitalWrite(EPD_PWR_EN, HIGH);   // power the panel
-#endif
-  SPI.begin(EPD_SCK, -1, EPD_MOSI, EPD_CS);
+  // Panel power is enabled in setup() via board::powerOn() (EPD rail is
+  // active-LOW on this board). Here we only wire SPI + the display driver.
+  //
+  // Drive CS as a plain GPIO owned by GxEPD2. Passing EPD_CS as the SPI SS pin
+  // makes the Arduino-ESP32 3.x SPI peripheral claim it, after which GxEPD2's
+  // manual digitalWrite(CS) is rejected ("IO xx is not set as GPIO") and the
+  // panel never latches data -> blank screen. So begin SPI with SS = -1.
+  pinMode(EPD_CS, OUTPUT);
+  digitalWrite(EPD_CS, HIGH);
+  SPI.begin(EPD_SCK, -1, EPD_MOSI, -1);
   display.init(115200);
   display.setRotation(0);
   display.setTextColor(GxEPD_BLACK);

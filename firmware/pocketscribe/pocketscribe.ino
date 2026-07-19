@@ -199,6 +199,16 @@ static void nextSection() {
 // --------------------------------------------------------------- lifecycle ---
 void setup() {
   Serial.begin(115200);
+
+  // Power the board rails BEFORE touching any peripheral. On this board the EPD
+  // and audio power enables are active-LOW and the battery-sense rail is
+  // active-HIGH (see board_pins.h / Waveshare board_power_bsp). Getting this
+  // wrong leaves the panel/codec unpowered -> blank screen + I2C failures.
+  pinMode(VBAT_PWR_EN, OUTPUT);  digitalWrite(VBAT_PWR_EN, VBAT_PWR_ON);
+  pinMode(EPD_PWR_EN, OUTPUT);   digitalWrite(EPD_PWR_EN, EPD_PWR_ON);
+  pinMode(AUDIO_PWR_EN, OUTPUT); digitalWrite(AUDIO_PWR_EN, AUDIO_PWR_ON);
+  delay(100);                    // let the rails settle before init
+
   ui::begin();
   ui::boot("Starting...");
 
